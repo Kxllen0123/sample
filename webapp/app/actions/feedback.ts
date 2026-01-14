@@ -11,11 +11,12 @@ export interface FeedbackResponse {
  * Server Action: 提交用户反馈
  */
 export async function submitFeedback(
-  content: string
+  content: string,
+  imageFileId?: string
 ): Promise<FeedbackResponse> {
   try {
     const service = new FeedbackService();
-    const result = await service.submitFeedback(content);
+    const result = await service.submitFeedback(content, imageFileId);
     
     console.log('=== Server Action 返回结果 ===');
     console.log('成功状态:', result.success);

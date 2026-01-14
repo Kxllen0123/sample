@@ -9,7 +9,7 @@ export class DifyAgentClient {
   /**
    * 调用 Dify Agent 处理反馈
    */
-  async processFeedback(content: string): Promise<DifyAgentResult> {
+  async processFeedback(content: string, imageFileId?: string): Promise<DifyAgentResult> {
     try {
       // 使用 Dify Workflow API
       // 如果配置了 workflow ID，使用 /workflows/{workflow_id}/run
@@ -18,7 +18,7 @@ export class DifyAgentClient {
         ? `${config.dify.apiEndpoint}/workflows/${config.dify.agentId}/run`
         : `${config.dify.apiEndpoint}/workflows/run`;
 
-      const requestBody = {
+      const requestBody: any = {
         inputs: {
           user_input: content, // Dify Workflow API 要求 user_input 字段
           feedback_content: content, // 同时提供 feedback_content 以兼容自定义 workflow
@@ -26,6 +26,22 @@ export class DifyAgentClient {
         user: 'user-feedback-system',
         response_mode: 'blocking' as const,
       };
+
+      // 如果有图片文件 ID，添加到 inputs 中，参数名为 user_image
+      if (imageFileId) {
+        console.log('=== 准备传递图片文件到 Workflow ===');
+        console.log('图片文件 ID:', imageFileId);
+        console.log('文件 ID 类型:', typeof imageFileId);
+        
+        requestBody.inputs.user_image = {
+          type: 'image',
+          transfer_method: 'local_file',
+          upload_file_id: imageFileId,
+        }
+        
+        console.log('Workflow 请求体中的 inputs:', JSON.stringify(requestBody.inputs, null, 2));
+        console.log('=== 图片文件传递准备结束 ===');
+      }
 
       const response = await fetch(
         workflowEndpoint,

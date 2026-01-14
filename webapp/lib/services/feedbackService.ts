@@ -18,7 +18,7 @@ export class FeedbackService {
   /**
    * 提交反馈
    */
-  async submitFeedback(content: string): Promise<SubmissionResult> {
+  async submitFeedback(content: string, imageFileId?: string): Promise<SubmissionResult> {
     // 1. 基本验证
     const validationResult = this.validator.validate(content);
     if (!validationResult.isValid) {
@@ -32,7 +32,7 @@ export class FeedbackService {
     const sanitizedContent = this.validator.sanitize(content);
 
     // 3. 调用 Dify Agent 完成分类、相关性检查和 Issue 创建
-    const agentResult = await this.difyClient.processFeedback(sanitizedContent);
+    const agentResult = await this.difyClient.processFeedback(sanitizedContent, imageFileId);
 
     // Dify Agent 返回的结果已经包含了所有信息（成功或失败）
     return {

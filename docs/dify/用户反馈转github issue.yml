@@ -3,7 +3,7 @@ app:
   icon: 🤖
   icon_background: '#FFEAD5'
   mode: workflow
-  name: 需求转github issue
+  name: 用户反馈转github issue
   use_icon_as_answer_icon: false
 dependencies:
 - current_identifier: null
@@ -15,7 +15,15 @@ kind: app
 version: 0.5.0
 workflow:
   conversation_variables: []
-  environment_variables: []
+  environment_variables:
+  - description: ''
+    id: c87f35f3-bbeb-4193-84c1-de87ea1fa8df
+    name: github_access_token
+    selector:
+    - env
+    - github_access_token
+    value: ""
+    value_type: string
   features:
     file_upload:
       allowed_file_extensions:
@@ -207,7 +215,22 @@ workflow:
           required: true
           type: paragraph
           variable: user_input
-      height: 109
+        - allowed_file_extensions: []
+          allowed_file_types:
+          - image
+          allowed_file_upload_methods:
+          - local_file
+          - remote_url
+          default: ''
+          hint: ''
+          label: user_image
+          max_length: 48
+          options: []
+          placeholder: ''
+          required: false
+          type: file
+          variable: user_image
+      height: 135
       id: '1768310665673'
       position:
         x: 80
@@ -237,17 +260,20 @@ workflow:
         - id: e479db96-8446-46f5-8680-5f4a30ef031d
           role: system
           text: "# Role\n你是一个用户反馈Agent，负责将用户的反馈输入解析并格式化为结构化的 GitHub Issue JSON 数据。\n\
-            \n\n\n\n# Task\n分析内容 `{{#1768310665673.user_input#}}`，识别其意图（enhancement\
-            \ 或 bug 或 Question）\n\n\n\n\n# Rules\n1. **分类逻辑**：\n   - 属于新功能、优化或改进：`label`\
-            \ 为 \"enhancement\"\n   - 属于程序错误、故障或异常：`label` 为 \"bug\"\n   - 属于建议： `label`\
-            \ 为 \"question\"\n   - 可以归入上述三类之一：`can_classify` 为 \"true\"\n   - 无法明确归入上述三类或内容无意义：`can_classify`\
-            \ 为 \"false\"\n2. **标题归纳**：\n   - 提取或总结用户输入的核心内容作为 `title`。\n   \n3. **输出限制**：\n\
-            \   - **必须** 仅输出合法的 JSON 字符串。\n   - 不得包含 Markdown 代码块标签（如 ```json ）。\n\
-            \   - 不得包含任何开场白或解释文字。\n   - 不得包含任何think的过程描述。\n\n\n\n# Output JSON Schema\n\
-            {\n   \"can_classify\": string,        // 是否可以分类\n   \"title\": string,\
-            \               // 标题 \n   \"label\": string,               // \"enhancement\"\
-            \ 或 \"bug\" 或 \"question\"，不相关则为空\n   \"content\": string            \
-            \ //原始输入内容 {{#1768310665673.user_input#}}\n}"
+            # Task\n分析内容 `{{#1768310665673.user_input#}}`，识别其意图（enhancement 或 bug\
+            \ 或 Question）\n# Rules\n1. **分类逻辑**：\n   - 属于新功能、优化或改进：`label` 为 \"enhancement\"\
+            \n   - 属于程序错误、故障或异常：`label` 为 \"bug\"\n   - 属于建议： `label` 为 \"question\"\
+            \n   - 可以归入上述三类之一：`can_classify` 为 \"true\"\n   - 无法明确归入上述三类或内容无意义：`can_classify`\
+            \ 为 \"false\"\n2. **图片识别逻辑**：\n   - 如果图片存在：\n     - 若图片是系统错误截图、功能UI截图，且与文字相关，则正常处理。\n\
+            \     - 若图片包含色情、暴力、或完全无关的内容（如随机生活照），则 `image_relate` 为 \"false\"\n   -\
+            \ 如果图片不存在：仅分析文字, `image_relate` 为 \"true\"\n\n\n\n3. **标题归纳**：\n   - 提取或总结用户输入的核心内容作为\
+            \ `title`。\n   \n4. **输出限制**：\n   - **必须** 仅输出合法的 JSON 字符串。\n   - 不得包含\
+            \ Markdown 代码块标签（如 ```json ）。\n   - 不得包含任何开场白或解释文字。\n   - 不得包含任何think的过程描述。\n\
+            \n\n\n# Output JSON Schema\n{\n   \"can_classify\": string,        //\
+            \ 是否可以分类\n   \"image_relate\": string,        // 图片是否相关\n   \"title\"\
+            : string,               // 标题 \n   \"label\": string,               //\
+            \ \"enhancement\" 或 \"bug\" 或 \"question\"，不相关则为空\n   \"content\": string\
+            \             //原始输入内容 {{#1768310665673.user_input#}}\n}"
         selected: false
         structured_output:
           schema:
@@ -256,6 +282,8 @@ workflow:
               can_classify:
                 type: string
               content:
+                type: string
+              image_relate:
                 type: string
               label:
                 type: string
@@ -266,12 +294,18 @@ workflow:
             - title
             - label
             - content
+            - image_relate
             type: object
         structured_output_enabled: true
         title: LLM
         type: llm
         vision:
-          enabled: false
+          configs:
+            detail: high
+            variable_selector:
+            - '1768310665673'
+            - user_image
+          enabled: true
       height: 88
       id: '1768310689222'
       position:
@@ -291,16 +325,21 @@ workflow:
           \        \n        # 2. 处理布尔值转换 (关键步骤)\n        # 模型返回的可能是字符串 \"true\"/\"\
           false\" 或 布尔值 True/False\n        # 我们统一转换为标准的 Python 布尔值\n        raw_can_classify\
           \ = data.get(\"can_classify\", False)\n        can_classify_bool = str(raw_can_classify).lower()\
-          \ == 'true'\n        reject_reason = \"您提的反馈无法明确归入功能增强、程序错误或提问三类，或内容无意义。\"\
-          \ if not can_classify_bool else \"\"\n        # 3. 返回清洗后的数据\n        return\
-          \ {\n            \"can_classify\": can_classify_bool,  # 这里输出真正的 True/False\n\
-          \            \"reject_reason\": reject_reason,\n            \"title\": data.get(\"\
+          \ == 'true'\n        raw_image_relate = data.get(\"image_relate\", True)\n\
+          \        image_relate_bool = str(raw_image_relate).lower() == 'true'\n \
+          \       reject_reason = \"您提的反馈无法明确归入功能增强、程序错误或提问三类，或内容无意义。\" if not can_classify_bool\
+          \ else \"\"\n        reject_reason = \"您上传的图片与反馈内容不相关。\" if not image_relate_bool\
+          \ else reject_reason\n        # 3. 返回清洗后的数据\n        return {\n        \
+          \    \"can_classify\": can_classify_bool,  # 这里输出真正的 True/False\n      \
+          \      \"image_relate\": image_relate_bool,  # 这里输出真正的 True/False\n    \
+          \        \"reject_reason\": reject_reason,\n            \"title\": data.get(\"\
           title\", \"\"),\n            \"label\": data.get(\"label\", \"\"),\n   \
           \         \"content\": data.get(\"content\", \"\")\n        }\n        \n\
           \    except Exception as e:\n        # 容错：如果解析失败，默认当作打回处理，防止工作流卡死\n    \
-          \    return {\n            \"can_classify\": False,\n            \"reject_reason\"\
-          : reject_reason,\n            \"title\": \"Error\",\n            \"label\"\
-          : \"\",\n            \"content\": \"\"\n        }"
+          \    return {\n            \"can_classify\": False,\n            \"image_relate\"\
+          : False,\n            \"reject_reason\": reject_reason,\n            \"\
+          title\": \"Error\",\n            \"label\": \"\",\n            \"content\"\
+          : \"\"\n        }"
         code_language: python3
         outputs:
           can_classify:
@@ -309,6 +348,9 @@ workflow:
           content:
             children: null
             type: string
+          image_relate:
+            children: null
+            type: boolean
           label:
             children: null
             type: string
@@ -351,12 +393,19 @@ workflow:
             variable_selector:
             - '1768311631086'
             - can_classify
+          - comparison_operator: is
+            id: 07982bce-f7c3-4c77-8546-aa599f37c13f
+            value: true
+            varType: boolean
+            variable_selector:
+            - '1768311631086'
+            - image_relate
           id: 'true'
           logical_operator: and
         selected: false
         title: IF/ELSE
         type: if-else
-      height: 124
+      height: 150
       id: '1768312571864'
       position:
         x: 976
@@ -382,7 +431,7 @@ workflow:
               {{#1768311631086.content#}}\",\n  \"labels\": [\"{{#1768311631086.label#}}\"\
               , \"user-feedback\"]\n}"
           type: json
-        headers: 
+        headers: 'Authorization:Bearer {{#env.github_access_token#}}
 
           Accept:application/vnd.github+json'
         method: post
@@ -409,7 +458,7 @@ workflow:
       positionAbsolute:
         x: 2255.142499950806
         y: -38.6770150873368
-      selected: false
+      selected: true
       sourcePosition: right
       targetPosition: left
       type: custom
@@ -432,7 +481,7 @@ workflow:
       positionAbsolute:
         x: 1303.7315804554796
         y: 541.1681408047058
-      selected: true
+      selected: false
       sourcePosition: right
       targetPosition: left
       type: custom
@@ -641,7 +690,7 @@ workflow:
       type: custom
       width: 242
     viewport:
-      x: -975.405372845204
-      y: 131.92600960332385
-      zoom: 0.8087690021950309
+      x: -545.3694854510343
+      y: 97.89709414665128
+      zoom: 0.4487648720797155
   rag_pipeline_variables: []
