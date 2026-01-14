@@ -94,7 +94,7 @@ export function FeedbackForm() {
     <Card className="w-full max-w-2xl mx-auto">
       <CardHeader>
         <CardDescription>
-          请分享您的功能改进建议，Bug或问题，我们会认真对待每一条反馈。
+          请分享您的功能增强建议、程序错误或提问我们会认真对待每一条反馈
         </CardDescription>
       </CardHeader>
       <CardContent>
